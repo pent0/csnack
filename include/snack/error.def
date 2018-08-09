@@ -1,0 +1,20 @@
+#ifndef DECL_ERROR
+#define DECL_ERROR(a, b, c)
+#endif
+
+DECL_ERROR(1,  unit_not_found, "Unit {} not found. Make sure the unit is not corrupted.")
+DECL_ERROR(2,  str_invalid_op, "Invalid binary operation with string. Can only add string.")
+DECL_ERROR(3,  stmt_unable_parse, "Unable to parse statement")
+DECL_ERROR(22, expect_got, "Expected {}, got {}")
+DECL_ERROR(23, expect_after, "Expected identfier after {}")
+DECL_ERROR(24, var_declared, "Variable {} already declared")
+DECL_ERROR(25, var_not_found, "Variable {} not found")
+DECL_ERROR(26, indentation_needed, "An indentation is needed at the start of a function or block declaration")
+DECL_ERROR(27, dedentation_needed, "A dedentation is needed at the end of a function or block declaration")
+DECL_ERROR(28, var_unintialized, "Variable not intialized, has value of none. If this is intentional, value should be assigned.")
+DECL_ERROR(29, invalid_use, "Unit reference statement must be in the root")
+DECL_ERROR(30, duplicate_func, "Found multi definition of function '{}' across units, use the declaration in the lastest unit or this unit.")
+DECL_ERROR(31, func_not_found, "Function not found: {}")
+
+// This error should be in debug compiler only
+DECL_ERROR(210, null_ast_node, "AST node is null")
