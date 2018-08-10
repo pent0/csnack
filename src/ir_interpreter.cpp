@@ -289,6 +289,335 @@ namespace snack::ir::backend {
         context.local_args[idx].str_data = "";
     }
 
+    void ir_interpreter::ceq(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            ir_element el_ret;
+            el_ret.type = ir_element::str;
+            el_ret.num_data = (el2.str_data == el1.str_data);
+
+            context.evaluation_stack.push(el_ret);
+
+            return;
+        }
+
+        ir_element el_ret;
+        el_ret.type = ir_element::num;
+        el_ret.num_data = (el2.num_data == el1.num_data);
+
+        context.evaluation_stack.push(el_ret);
+    }
+
+    void ir_interpreter::cgt(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            ir_element el_ret;
+            el_ret.type = ir_element::str;
+            el_ret.num_data = (el2.str_data > el1.str_data);
+
+            context.evaluation_stack.push(el_ret);
+
+            return;
+        }
+
+        ir_element el_ret;
+        el_ret.type = ir_element::num;
+        el_ret.num_data = (el2.num_data > el1.num_data);
+
+        context.evaluation_stack.push(el_ret);
+    }
+
+    void ir_interpreter::cge(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            ir_element el_ret;
+            el_ret.type = ir_element::str;
+            el_ret.num_data = (el2.str_data >= el1.str_data);
+
+            context.evaluation_stack.push(el_ret);
+
+            return;
+        }
+
+        ir_element el_ret;
+        el_ret.type = ir_element::num;
+        el_ret.num_data = (el2.num_data >= el1.num_data);
+
+        context.evaluation_stack.push(el_ret);
+    }
+
+    void ir_interpreter::clt(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            ir_element el_ret;
+            el_ret.type = ir_element::str;
+            el_ret.num_data = (el2.str_data < el1.str_data);
+
+            context.evaluation_stack.push(el_ret);
+
+            return;
+        }
+
+        ir_element el_ret;
+        el_ret.type = ir_element::num;
+        el_ret.num_data = (el2.num_data < el1.num_data);
+
+        context.evaluation_stack.push(el_ret);
+    }
+
+    void ir_interpreter::cle(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            ir_element el_ret;
+            el_ret.type = ir_element::str;
+            el_ret.num_data = (el2.str_data <= el1.str_data);
+
+            context.evaluation_stack.push(el_ret);
+
+            return;
+        }
+
+        ir_element el_ret;
+        el_ret.type = ir_element::num;
+        el_ret.num_data = (el2.num_data <= el1.num_data);
+
+        context.evaluation_stack.push(el_ret);
+    }
+
+    void ir_interpreter::ble(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            if (el2.str_data <= el1.str_data) {
+                context.pc = jump_pc;
+            }
+
+            return;
+        }
+
+        if (el2.num_data <= el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::blt(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            if (el2.str_data < el1.str_data) {
+                context.pc = jump_pc;
+            }
+
+            return;
+        }
+
+        if (el2.num_data < el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::beq(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            if (el2.str_data == el1.str_data) {
+                context.pc = jump_pc;
+            }
+
+            return;
+        }
+
+        if (el2.num_data == el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::bge(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            if (el2.str_data >= el1.str_data) {
+                context.pc = jump_pc;
+            }
+
+            return;
+        }
+
+        if (el2.num_data >= el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::bgt(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+        ir_element el2 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::str || el2.type == ir_element::str) {
+            if (el2.str_data > el1.str_data) {
+                context.pc = jump_pc;
+            }
+
+            return;
+        }
+
+        if (el2.num_data > el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::br(ir_interpreter_func_context &context) {
+        context.pc += 2;
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc = jump_pc;
+    }
+
+    void ir_interpreter::brt(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::num && el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::brf(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        const size_t jump_pc = *reinterpret_cast<const size_t *>(context.ir_bin + context.pc);
+
+        context.pc += sizeof(size_t);
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type == ir_element::num && !el1.num_data) {
+            context.pc = jump_pc;
+        }
+    }
+
+    void ir_interpreter::uno(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type != ir_element::str) {
+            el1.num_data = !(el1.num_data);
+            context.evaluation_stack.push(el1);
+        } else {
+            // report
+        }
+    }
+
+    void ir_interpreter::ung(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type != ir_element::str) {
+            el1.num_data = -(el1.num_data);
+            context.evaluation_stack.push(el1);
+        } else {
+            // report
+        }
+    }
+
+    void ir_interpreter::uin(ir_interpreter_func_context &context) {
+        context.pc += 2;
+
+        ir_element el1 = context.evaluation_stack.top();
+        context.evaluation_stack.pop();
+
+        if (el1.type != ir_element::str) {
+            el1.num_data = ~(int64_t)(el1.num_data);
+            context.evaluation_stack.push(el1);
+        } else {
+            // report
+        }
+    }
+
     void ir_interpreter::call(ir_interpreter_func_context &context) {
         context.pc += 2;
 
@@ -359,7 +688,23 @@ namespace snack::ir::backend {
             { ir::opcode::vri, BRIDGE(vri) },
             { ir::opcode::vrs, BRIDGE(vrs) },
             { ir::opcode::call, BRIDGE(call) },
-            { ir::opcode::endmet, BRIDGE(endmet) }
+            { ir::opcode::endmet, BRIDGE(endmet) },
+            { ir::opcode::ceq, BRIDGE(ceq) },
+            { ir::opcode::clt, BRIDGE(clt) },
+            { ir::opcode::cle, BRIDGE(cle) },
+            { ir::opcode::cgt, BRIDGE(cgt) },
+            { ir::opcode::cge, BRIDGE(cge) },
+            { ir::opcode::beq, BRIDGE(beq) },
+            { ir::opcode::bge, BRIDGE(bge) },
+            { ir::opcode::bgt, BRIDGE(bgt) },
+            { ir::opcode::ble, BRIDGE(ble) },
+            { ir::opcode::blt, BRIDGE(blt) },
+            { ir::opcode::br, BRIDGE(br) },
+            { ir::opcode::brt, BRIDGE(brt) },
+            { ir::opcode::brf, BRIDGE(brf) },
+            { ir::opcode::uno, BRIDGE(uno) },
+            { ir::opcode::uin, BRIDGE(uin) },
+            { ir::opcode::ung, BRIDGE(ung) }
         };
     }
 

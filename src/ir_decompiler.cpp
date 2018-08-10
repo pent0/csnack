@@ -48,11 +48,14 @@ namespace snack::ir::frontend {
         case opcode::bge:
         case opcode::bgt:
         case opcode::blt:
-        case opcode::ble: {
+        case opcode::ble: 
+        case opcode::br: 
+        case opcode::brt: 
+        case opcode::brf: {
             size_t off = 0;
             ir_bin.read(reinterpret_cast<char *>(&off), sizeof(size_t));
 
-            std::cout << " " << off;
+            std::cout << " 0x" << std::hex << off;
 
             pc += sizeof(size_t);
 
@@ -68,7 +71,7 @@ namespace snack::ir::frontend {
             size_t off = 0;
             ir_bin.read(reinterpret_cast<char *>(&off), sizeof(size_t));
 
-            std::cout << " " << off;
+            std::cout << " 0x" << std::hex << off;
 
             pc += sizeof(size_t) + 2;
 
@@ -84,7 +87,7 @@ namespace snack::ir::frontend {
             uint8_t idx = 0;
             ir_bin.read(reinterpret_cast<char *>(&idx), 1);
 
-            std::cout << " " << (int)idx;
+            std::cout << " 0x" << std::hex << (int)idx;
 
             pc += 1;
 

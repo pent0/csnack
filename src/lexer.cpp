@@ -57,7 +57,7 @@ namespace snack {
         new_token.column = 1;
         new_token.row = line;
 
-        new_token.token_data_raw = "";
+        new_token.token_data_raw = "indent";
         new_token.type = token_type::indent;
 
         return new_token;
@@ -69,7 +69,7 @@ namespace snack {
         new_token.column = 1;
         new_token.row = line;
 
-        new_token.token_data_raw = "";
+        new_token.token_data_raw = "dedent";
         new_token.type = token_type::dedent;
 
         return new_token;

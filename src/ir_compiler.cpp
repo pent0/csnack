@@ -64,7 +64,10 @@ namespace snack::ir::backend {
         case opcode::bge:
         case opcode::bgt:
         case opcode::blt:
-        case opcode::ble: {
+        case opcode::ble:
+        case opcode::br:
+        case opcode::brt:
+        case opcode::brf: {
             ir_bin.write(reinterpret_cast<const char *>(&value), sizeof(size_t));
             funcs.back().crr_pc += sizeof(size_t);
 
@@ -174,13 +177,24 @@ namespace snack::ir::backend {
             return;
         }
 
-        if (node->get_node_type() == node_type::number) {
+        node_type nt = node->get_node_type();
+
+        switch (nt) {
+        case node_type::number: {
             std::shared_ptr<number_node> num = std::dynamic_pointer_cast<number_node>(node);
             emit(opcode::ldcst, num->get_value());
-        } else if (node->get_node_type() == node_type::string) {
+
+            break;
+        }
+
+        case node_type::string: {
             std::shared_ptr<string_node> str = std::dynamic_pointer_cast<string_node>(node);
             emit(opcode::ldcststr, str->get_string());
-        } else if (node->get_node_type() == node_type::var) {
+
+            break;
+        }
+
+        case node_type::var: {
             for (uint8_t i = 0; i < func->get_args().size(); i++) {
                 if (func->get_args()[i] == node) {
                     emit(opcode::ldarg, i);
@@ -193,36 +207,24 @@ namespace snack::ir::backend {
             if (var_idx != func->get_local_vars().end()) {
                 emit(opcode::ldlc, var_idx - func->get_local_vars().begin());
             }
-        } else if (node->get_node_type() == node_type::null) {
+
+            break;
+        }
+
+        case node_type::null: {
             emit(opcode::ldnull);
-        } else if (node->get_node_type() == node_type::unary) {
-            std::shared_ptr<unary_node> un = std::dynamic_pointer_cast<unary_node>(node);
+            break;
+        }
 
-            build_push_hs(func, un->get_unary_target());
+        case node_type::unary: {
+            build_unary(func, std::dynamic_pointer_cast<unary_node>(node));
+            break;
+        }
 
-            switch (un->get_unary_op()) {
-            case caculate_op::sub: {
-                emit(opcode::ung);
-                break;
-            }
-
-            case caculate_op::reverse: {
-                emit(opcode::uin);
-                break;
-            }
-
-            case caculate_op::add: {
-                emit(opcode::upn);
-                break;
-            }
-
-            case caculate_op::not: {
-                emit(opcode::uno);
-                break;
-            }
-            }
-        } else {
+        default: {
             build_node(func, node);
+            break;
+        }
         }
     }
 
@@ -332,9 +334,9 @@ namespace snack::ir::backend {
 
         for (size_t i = 0; i < target->get_childrens().size(); i++) {
             if (target->get_childrens()[i]->get_node_type() == node_type::function) {
-                function_node_ptr func = std::dynamic_pointer_cast<function_node>(target->get_childrens()[i]);
+                function_node_ptr func_callee = std::dynamic_pointer_cast<function_node>(target->get_childrens()[i]);
 
-                if (func->get_name() == func_call->get_function()->get_name()) {
+                if (func_callee->get_name() == func_call->get_function()->get_name() && func_callee->get_args().size() == func_call->get_args().size()) {
                     index_unit = 0x7FFF;
                     index_func = func_idx;
 
@@ -355,7 +357,7 @@ namespace snack::ir::backend {
                     continue;
                 }
 
-                auto idx_func_temp = unit->get_function_idx(func_call->get_function()->get_name());
+                auto idx_func_temp = unit->get_function_idx(func_call->get_function()->get_name(), func_call->get_args().size());
 
                 if (!idx_func_temp) {
                     continue;
@@ -416,6 +418,21 @@ namespace snack::ir::backend {
 
         case node_type::if_else: {
             build_if_else(func, std::dynamic_pointer_cast<if_else_node>(node));
+            break;
+        }
+
+        case node_type::block: {
+            std::shared_ptr<block_node> block = std::dynamic_pointer_cast<block_node>(node);
+
+            for (const auto &child : block->get_childrens()) {
+                build_node(func, child);
+            }
+
+            break;
+        }
+
+        default: {
+            break;
         }
         }
     }
@@ -453,12 +470,42 @@ namespace snack::ir::backend {
         ir_bin.write(reinterpret_cast<const char *>(&header), sizeof(ir_binary_header));
     }
 
+    void ir_compiler::build_unary(function_node_ptr func, std::shared_ptr<unary_node> node) {
+        build_push_hs(func, node->get_lhs());
+
+        switch (node->get_unary_op()) {
+        case caculate_op::not: {
+            emit(opcode::uno);
+            break;
+        }
+
+        case caculate_op::add: {
+            break;
+        }
+
+        case caculate_op::sub: {
+            emit(opcode::ung);
+            break;
+        }
+
+        case caculate_op::reverse: {
+            emit(opcode::uin);
+            break;
+        }
+
+        default: {
+            do_report(error_panic_code::invalid_unary, error_level::error, node);
+            break;
+        }
+        }
+    }
+
     void ir_compiler::build_if_else(function_node_ptr func, std::shared_ptr<if_else_node> node) {
         build_condition(func, node->get_condition());
 
-        emit(opcode::ldcst, 0);
+        //emit(opcode::ldcst, 0);
         size_t rewrite_addr = static_cast<size_t>(ir_bin.tellp()) + 2;
-        emit(opcode::ble, 0);
+        emit(opcode::brf, 0);
 
         for (const auto &if_blck_stmt : node->get_if_block()->get_childrens()) {
             build_node(func, if_blck_stmt);
@@ -467,14 +514,30 @@ namespace snack::ir::backend {
         size_t else_block_addr = funcs.back().crr_pc;
         size_t last_pos = ir_bin.tellp();
 
+        if (node->get_else_block()) {
+            // If there is node block, there will be a br opcode that jump to the end of the else block.
+            // That opcode is still belongs to if, so increase the else block address by size of br instruction.
+            else_block_addr += 2 + sizeof(size_t);
+        }
+
         ir_bin.seekp(rewrite_addr);
         ir_bin.write(reinterpret_cast<const char *>(&else_block_addr), sizeof(size_t));
         ir_bin.seekp(last_pos);
 
         if (node->get_else_block()) {
+            size_t revist_addr = static_cast<size_t>(ir_bin.tellp()) + 2;
+            emit(opcode::br, 0);
+
             for (const auto &else_blck_stmt : node->get_else_block()->get_childrens()) {
                 build_node(func, else_blck_stmt);
             }
+
+            size_t else_block_end_addr = funcs.back().crr_pc;
+            last_pos = ir_bin.tellp();
+
+            ir_bin.seekp(revist_addr);
+            ir_bin.write(reinterpret_cast<const char *>(&else_block_end_addr), sizeof(size_t));
+            ir_bin.seekp(last_pos);
         }
     }
 
@@ -495,15 +558,15 @@ namespace snack::ir::backend {
             if (cn->get_op() == caculate_op::logical_and) {
                 // Compare the current node, if it's not good (expression is false),
                 // branch to after the binary
-                emit(opcode::ldcst, 0);
+                //emit(opcode::ldcst, 0);
                 revisit_write = static_cast<size_t>(ir_bin.tellp()) + 2;
-                emit(opcode::ble, 0);
+                emit(opcode::brf, 0);
             } else if (cn->get_op() == caculate_op::logical_or) {
                 // Compare the current node, if it's good (expression is false),
                 // branch to after the binary
-                emit(opcode::ldcst, 0);
+                //emit(opcode::ldcst, 0);
                 revisit_write = static_cast<size_t>(ir_bin.tellp()) + 2;
-                emit(opcode::bgt, 0);
+                emit(opcode::brt, 0);
             }
 
             build_push_hs(func, node->get_rhs());
@@ -516,7 +579,7 @@ namespace snack::ir::backend {
             ir_bin.write(reinterpret_cast<const char *>(&revisit_result), sizeof(size_t));
 
             ir_bin.seekp(last_pos);
-        } else if (node->get_node_type() == node_type::number) {
+        } else {
             build_push_hs(func, node);
         }
     }

@@ -50,6 +50,7 @@ namespace snack {
         null,
         unit_ref,
         if_else,
+        block,
         unknown
     };
 
@@ -326,12 +327,17 @@ namespace snack {
             return unit_name;
         }
     };
+    
+    class block_node : public stmt_node {
+    public:
+        block_node(node_ptr parent, token tok);
+    };
 
     class if_else_node : public stmt_node {
         node_ptr condition;
 
-        std::shared_ptr<stmt_node> if_block;
-        std::shared_ptr<stmt_node> else_block;
+        std::shared_ptr<block_node> if_block;
+        std::shared_ptr<block_node> else_block;
 
         friend class parser;
 
@@ -342,11 +348,11 @@ namespace snack {
             return condition;
         }
 
-        std::shared_ptr<stmt_node> get_if_block() {
+        std::shared_ptr<block_node> get_if_block() {
             return if_block;
         }
 
-        std::shared_ptr<stmt_node> get_else_block() {
+        std::shared_ptr<block_node> get_else_block() {
             return else_block;
         }
     };

@@ -27,6 +27,16 @@ namespace snack {
         }
     }
 
+    void parser::do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1,
+        const std::string &arg2) {
+        if (err_manager) {
+            std::string temp_arr[] = { arg0, arg1, arg2 };
+
+            err_manager->throw_error(error_category::parser, level, error_code,
+                tok.get_column(), tok.get_row(), temp_arr, 3);
+        }
+    }
+
     void parser::do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1) {
         if (err_manager) {
             err_manager->throw_error(error_category::parser, level, error_code,
@@ -107,15 +117,16 @@ namespace snack {
         return nullptr;
     }
 
-    function_node_ptr parser::get_function(const std::string &func_name) {
+    function_node_ptr parser::get_function(const std::string &func_name, size_t arg_count) {
         auto &res = std::find_if(functions.begin(), functions.end(),
-            [&](function_node_ptr func) { return func->get_name() == func_name; });
+            [&](function_node_ptr func) { return (func->get_name() == func_name) && (func->get_args().size() == arg_count); });
 
         if (res == functions.end()) {
             // Make external function
             function_node_ptr func = std::make_shared<function_node>(unit, token{});
             func->name = func_name;
             func->func_type = function_type::external;
+            func->args.resize(arg_count);
 
             functions.push_back(func);
 
@@ -155,6 +166,8 @@ namespace snack {
                 return parse_return(parent);
             } else if (tok_val == "if") {
                 return parse_if_else(parent);
+            } else if (tok_val == "do") {
+                return parse_do_chain(parent);
             } else if (tok_val == "uses") {
                 if (parent->get_node_type() != node_type::unit) {
                     do_report(error_panic_code::invalid_use, snack::error_level::error,
@@ -197,9 +210,7 @@ namespace snack {
 
                     return parse_assign_node(parent, var);
                 } else if (tok_p && tok_p->get_raw_token_string() == "(") {
-                    auto func = get_function(tok->get_raw_token_string());
-
-                    return parse_function_call(parent, func);
+                    return parse_function_call(parent);
                 }
 
                 return parse_expr(parent);
@@ -304,7 +315,7 @@ namespace snack {
             if (code_lexer.get_current_token() && code_lexer.get_current_token()->get_raw_token_string() == "(") {
                 code_lexer.back();
 
-                return parse_function_call(parent, get_function(tok->get_raw_token_string()));
+                return parse_function_call(parent);
             }
 
             code_lexer.back();
@@ -319,7 +330,7 @@ namespace snack {
         case token_type::parentheses: {
             if (tok->get_raw_token_string() != "(") {
                 //throw expected got
-                do_report(error_panic_code::expect_got, error_level::error, *tok,
+                do_report(error_panic_code::expect_got, error_level::error, *code_lexer.get_last_token(),
                     "'('", tok->get_raw_token_string());
 
                 return nullptr;
@@ -331,7 +342,7 @@ namespace snack {
 
             if (tok && tok->get_raw_token_string() != ")") {
                 // throw expected error
-                do_report(error_panic_code::expect_got, error_level::error, *tok,
+                do_report(error_panic_code::expect_got, error_level::error, *code_lexer.get_last_token(),
                     "')'", tok->get_raw_token_string());
 
                 return nullptr;
@@ -342,8 +353,8 @@ namespace snack {
         }
 
         // throw error
-        do_report(error_panic_code::expect_got, error_level::error, *tok,
-            "a factor", tok->get_raw_token_string());
+        do_report(error_panic_code::expect_after_got, error_level::error, *code_lexer.get_last_token(),
+            "an expression", code_lexer.get_last_token()->get_raw_token_string(), tok->get_raw_token_string());
 
         return nullptr;
     }
@@ -382,24 +393,6 @@ namespace snack {
                 code_lexer.next();
             } else if (tok->get_raw_token_string() == "<<") {
                 op = caculate_op::shl;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == "==") {
-                op = caculate_op::equal;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == "!=") {
-                op = caculate_op::not;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == ">=") {
-                op = caculate_op::greater_equal;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == "<=") {
-                op = caculate_op::less_equal;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == ">") {
-                op = caculate_op::greater;
-                code_lexer.next();
-            } else if (tok->get_raw_token_string() == "<") {
-                op = caculate_op::less;
                 code_lexer.next();
             } else {
                 break;
@@ -455,6 +448,24 @@ namespace snack {
             } else if (tok.get_raw_token_string() == "||") {
                 op = caculate_op::logical_or;
                 code_lexer.next();
+            } else if (tok.get_raw_token_string() == "==") {
+                op = caculate_op::equal;
+                code_lexer.next();
+            } else if (tok.get_raw_token_string() == "!=") {
+                op = caculate_op::not;
+                code_lexer.next();
+            } else if (tok.get_raw_token_string() == ">=") {
+                op = caculate_op::greater_equal;
+                code_lexer.next();
+            } else if (tok.get_raw_token_string() == "<=") {
+                op = caculate_op::less_equal;
+                code_lexer.next();
+            } else if (tok.get_raw_token_string() == ">") {
+                op = caculate_op::greater;
+                code_lexer.next();
+            } else if (tok.get_raw_token_string() == "<") {
+                op = caculate_op::less;
+                code_lexer.next();
             } else {
                 break;
             }
@@ -506,10 +517,9 @@ namespace snack {
             return nullptr;
         }
 
-        ie->if_block = std::make_shared<stmt_node>(ie, *tok);
+        ie->if_block = std::make_shared<block_node>(ie, *tok);
 
-        while (code_lexer.get_current_token() && code_lexer.get_current_token()->get_token_type() != token_type::dedent &&
-            code_lexer.get_current_token()->get_token_type() != token_type::eof) {
+        while (code_lexer.get_current_token() && code_lexer.get_current_token()->get_token_type() != token_type::dedent && code_lexer.get_current_token()->get_token_type() != token_type::eof) {
             node_ptr nd = parse_stmt(ie);
 
             if (nd) {
@@ -540,10 +550,9 @@ namespace snack {
                 return nullptr;
             }
 
-            ie->else_block = std::make_shared<stmt_node>(ie, *tok);
+            ie->else_block = std::make_shared<block_node>(ie, *tok);
 
-            while (code_lexer.get_current_token() && ((code_lexer.get_current_token()->get_token_type() != token_type::dedent) &&
-                    code_lexer.get_current_token()->get_token_type() != token_type::eof)) {
+            while (code_lexer.get_current_token() && ((code_lexer.get_current_token()->get_token_type() != token_type::dedent) && code_lexer.get_current_token()->get_token_type() != token_type::eof)) {
                 node_ptr nd = parse_stmt(ie);
 
                 if (nd) {
@@ -557,6 +566,71 @@ namespace snack {
         }
 
         return ie;
+    }
+
+    std::shared_ptr<node> parser::parse_do_chain(node_ptr parent) {
+        code_lexer.next();
+        std::shared_ptr<block_node> do_block = std::make_shared<block_node>(parent, *code_lexer.get_current_token());
+
+        code_lexer.next();
+        auto tok = code_lexer.get_current_token();
+
+        if (tok && tok->get_token_type() != token_type::colon) {
+            // Get the do token, since the next token maybe in the line under
+            do_report(error_panic_code::expect_after, error_level::error, *code_lexer.get_last_token(), "':'", "'do'",
+                tok->get_raw_token_string());
+
+            return nullptr;
+        }
+
+        tok = code_lexer.peek();
+
+        if (tok && tok->get_token_type() != token_type::indent) {
+            // Get the do token, since the next token maybe in the line under
+            do_report(error_panic_code::indentation_needed, error_level::error, *code_lexer.get_last_token());
+            return nullptr;
+        }
+
+        code_lexer.next();
+        tok = code_lexer.peek();
+
+        while (tok && tok->get_token_type() != token_type::dedent && tok->get_token_type() != token_type::eof) {
+            auto do_block_stmt = parse_stmt(do_block);
+
+            if (do_block_stmt) {
+                do_block->add_children(do_block_stmt);
+            }
+
+            tok = code_lexer.peek();
+        }
+
+        // Emit dedent token
+        if (tok->get_token_type() == token_type::eof) {
+            do_report(error_panic_code::expect_after_got, error_level::error, *code_lexer.get_last_token(),
+                "dedentation", "do block", "EOF");
+
+            return do_block;
+        }
+
+        code_lexer.next();
+        tok = code_lexer.peek();
+
+        if (tok->get_raw_token_string() == "unless") {
+            std::shared_ptr<if_else_node> con_node = std::make_shared<if_else_node>(parent, *tok);
+            std::shared_ptr<unary_node> real_condition = std::make_shared<unary_node>(con_node, *tok);
+
+            code_lexer.next();
+
+            real_condition->left = std::move(parse_expr(real_condition));
+            real_condition->unary_op = caculate_op::not;
+
+            con_node->condition = std::move(real_condition);
+            con_node->if_block = std::move(do_block);
+
+            return con_node;
+        }
+
+        return do_block;
     }
 
     std::shared_ptr<var_node> parser::parse_var(node_ptr parent) {
@@ -757,10 +831,9 @@ namespace snack {
         return func;
     }
 
-    std::shared_ptr<function_call_node> parser::parse_function_call(node_ptr parent, function_node_ptr func) {
+    std::shared_ptr<function_call_node> parser::parse_function_call(node_ptr parent) {
         std::shared_ptr<function_call_node> func_call = std::make_shared<function_call_node>(parent, *code_lexer.get_current_token());
-
-        func_call->func = func;
+        std::string func_name = code_lexer.get_current_token()->get_raw_token_string();
 
         code_lexer.next();
 
@@ -799,6 +872,8 @@ namespace snack {
 
             code_lexer.next();
         }
+
+        func_call->func = get_function(func_name, func_call->args_passed.size());
 
         return func_call;
     }

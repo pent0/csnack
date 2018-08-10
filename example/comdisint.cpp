@@ -15,11 +15,12 @@ const char *test_script = {
     "fn test:\n"
     "    var a = 6\n"
     "    var b = 7\n"
-    "    if (a == b) && (5 == 6):\n"
-    "        print('hi')\n"
+    "    do:\n"
+    "        print('Hi')\n"
     "\n"
     "fn main:\n"
-    "    test()"
+    "    if (6):\n"
+    "        test()\n"
 };
 
 void error_manager_test() {
@@ -96,7 +97,7 @@ void compiler_test() {
     manager.add_external_unit(std::make_shared<snack::userspace::interpreted_unit>("bim", res.data()));
 
     snack::userspace::unit_ptr unit = manager.use_unit("bim");
-    size_t index = *unit->get_function_idx("main");
+    size_t index = *unit->get_function_idx("main", 0);
 
     unit->call_function(&interpreter, index, nullptr);
 

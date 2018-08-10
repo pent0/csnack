@@ -73,9 +73,9 @@ namespace snack::userspace {
 
     std_unit::std_unit()
         : external_unit("std") {
-        REGISTER_UNIT_FUNC(std_unit, "print", print);
-        REGISTER_UNIT_FUNC(std_unit, "sin", sin);
-        REGISTER_UNIT_FUNC(std_unit, "cos", print);
-        REGISTER_UNIT_FUNC(std_unit, "tan", print);
+        REGISTER_UNIT_FUNC(std_unit, "print", print, -1);
+        REGISTER_UNIT_FUNC(std_unit, "sin", sin, 1);
+        REGISTER_UNIT_FUNC(std_unit, "cos", print, 1);
+        REGISTER_UNIT_FUNC(std_unit, "tan", print, 1);
     }
 }

@@ -91,6 +91,25 @@ namespace snack::ir::backend {
         void shr(ir_interpreter_func_context &context);
         void pwr(ir_interpreter_func_context &context);
 
+        void ceq(ir_interpreter_func_context &context);
+        void cgt(ir_interpreter_func_context &context);
+        void cge(ir_interpreter_func_context &context);
+        void clt(ir_interpreter_func_context &context);
+        void cle(ir_interpreter_func_context &context);
+
+        void ble(ir_interpreter_func_context &context);
+        void blt(ir_interpreter_func_context &context);
+        void beq(ir_interpreter_func_context &context);
+        void bge(ir_interpreter_func_context &context);
+        void bgt(ir_interpreter_func_context &context);
+        void br(ir_interpreter_func_context &context);
+        void brf(ir_interpreter_func_context &context);
+        void brt(ir_interpreter_func_context &context);
+
+        void uno(ir_interpreter_func_context &context);
+        void ung(ir_interpreter_func_context &context);
+        void uin(ir_interpreter_func_context &context);
+
         void met(ir_interpreter_func_context &context);
         void endmet(ir_interpreter_func_context &context);
         void vri(ir_interpreter_func_context &context);

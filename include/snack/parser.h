@@ -56,22 +56,25 @@ namespace snack {
 
         std::shared_ptr<var_node> parse_var(node_ptr parent);
         std::shared_ptr<if_else_node> parse_if_else(node_ptr parent);
+        std::shared_ptr<node> parse_do_chain(node_ptr parent);
 
         std::shared_ptr<assign_node> parse_assign_node(node_ptr parent, var_node_ptr lhs);
-        std::shared_ptr<function_call_node> parse_function_call(node_ptr parent, function_node_ptr func);
+        std::shared_ptr<function_call_node> parse_function_call(node_ptr parent);
 
         type_node_ptr make_undefined_type();
         number_node_ptr make_number(const long double num);
         string_node_ptr make_string(const std::string &str);
 
         var_node_ptr get_var(node_ptr parent, const std::string &ident_name);
-        function_node_ptr get_function(const std::string &func_name);
+        function_node_ptr get_function(const std::string &func_name, size_t arg_count);
 
         void do_parsing();
 
         void do_report(int error_code, error_level level, token tok);
         void do_report(int error_code, error_level level, token tok, const std::string &arg0);
         void do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1);
+        void do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1,
+            const std::string &arg2);
 
     public:
         parser(error_manager &err_mngr, lexer &lex);

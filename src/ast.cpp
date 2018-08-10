@@ -127,4 +127,9 @@ namespace snack {
         : stmt_node(parent, node_type::if_else, tok) {
 
     }
+
+    block_node::block_node(node_ptr parent, token tok) 
+        : stmt_node(parent, node_type::block, tok) {
+
+    }
 }

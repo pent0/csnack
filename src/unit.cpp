@@ -14,6 +14,7 @@ namespace snack::userspace {
 
         for (size_t i = 0; i < header->func_count; i++) {
             const size_t addr = *reinterpret_cast<const size_t *>(ir_bin + header->func_table_addr + i * sizeof(size_t));
+            const uint16_t arg_count = *reinterpret_cast<const size_t *>(ir_bin + addr + 2);
             const size_t name_addr = *reinterpret_cast<const size_t *>(ir_bin + addr + 4);
 
             const size_t name_len = *reinterpret_cast<const size_t *>(ir_bin + name_addr + 2);
@@ -23,8 +24,7 @@ namespace snack::userspace {
 
             std::copy(ir_bin + name_addr + 2 + sizeof(size_t), ir_bin + name_addr + 2 + sizeof(size_t) + name_len, name.begin());
 
-            func_entries_map.emplace(name, addr);
-            function_names.push_back(name);
+            functions.push_back(interpreted_unit_func_info{ name, addr, arg_count });
         }
 
         size_t ref_pc = header->ref_table_addr;
@@ -43,27 +43,28 @@ namespace snack::userspace {
         }
     }
 
-    std::optional<size_t> interpreted_unit::get_function_idx(const std::string &name) {
-        const auto &func = std::find(function_names.begin(), function_names.end(), name);
+    std::optional<size_t> interpreted_unit::get_function_idx(const std::string &name, size_t arg_count) {
+        const auto &func = std::find_if(functions.begin(), functions.end(), 
+            [&](interpreted_unit_func_info &info) { return info.name ==name && info.arg_count ==arg_count; });
 
-        if (func == function_names.end()) {
+        if (func == functions.end()) {
             return std::optional<size_t>{};
         }
 
-        return func - function_names.begin();
+        return func - functions.begin();
     }
 
     bool interpreted_unit::call_function(ir::backend::ir_interpreter *interpreter, const uint8_t idx,
         ir::backend::ir_interpreter_func_context *context) {
-        if (idx >= function_names.size()) {
+        if (idx >= functions.size()) {
             return false;
         }
 
         ir::backend::ir_interpreter_func_context function;
 
         function.pc = 0;
-        function.func_name = function_names[idx];
-        function.ir_bin = ir_bin + func_entries_map[function_names[idx]];
+        function.func_name = functions[idx].name;
+        function.ir_bin = ir_bin + functions[idx].addr;
         function.ir_global_bin = ir_bin;
         function.owning_unit = this;
 
@@ -74,7 +75,7 @@ namespace snack::userspace {
 
     std::optional<std::string> interpreted_unit::get_reference_unit_name(const uint8_t idx) {
         if (idx >= unit_ref_names.size()) {
-            return std::optional<std::string> {};
+            return std::optional<std::string>{};
         }
 
         return unit_ref_names[idx];
@@ -82,17 +83,6 @@ namespace snack::userspace {
 
     external_unit::external_unit(const std::string &unit_name)
         : name(unit_name) {
-    }
-
-    std::optional<userspace::function> external_unit::get_function(const std::string &name) {
-        auto &res = std::find_if(functions.begin(), functions.end(),
-            [&](func_info &inf) { return inf.name == name; });
-
-        if (res == functions.end()) {
-            return std::optional<userspace::function>{};
-        }
-
-        return res->real_func;
     }
 
     bool external_unit::call_function(ir::backend::ir_interpreter *interpreter, const uint8_t idx,
@@ -108,9 +98,9 @@ namespace snack::userspace {
         return true;
     }
 
-    std::optional<size_t> external_unit::get_function_idx(const std::string &name) {
+    std::optional<size_t> external_unit::get_function_idx(const std::string &name, size_t arg_count) {
         const auto &func = std::find_if(functions.begin(), functions.end(),
-            [&](func_info &inf) { return inf.name == name; });
+            [&](func_info &inf) { return (inf.name == name) && (inf.arg_count == -1 || (inf.arg_count ==arg_count)); });
 
         if (func == functions.end()) {
             return std::optional<size_t>{};

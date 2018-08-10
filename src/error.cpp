@@ -142,6 +142,10 @@ namespace snack {
         error err = make_error(place, cagetory, error_code, column, line);
         err.description = get_error_description(error_code);
 
+        if (cagetory == error_level::critical || cagetory == error_level::error) {
+            actual_error++;
+        }
+
         if (err.description) {
             size_t pos = err.description->find("{}");
 
