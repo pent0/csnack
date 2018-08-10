@@ -17,6 +17,8 @@ DECL_ERROR(30, duplicate_func, "Found multi definition of function '{}' across u
 DECL_ERROR(31, func_not_found, "Function not found: {}")
 DECL_ERROR(32, expect_after_got, "Expected {} after {}, got {}")
 DECL_ERROR(33, invalid_unary, "Invalid unary type")
+DECL_ERROR(34, loop_condition_only, "Only conditions are allowed in stage 2 of for-loop statement.")
+DECL_ERROR(35, expect, "Expect {}")
 
 // This error should be in debug compiler only
 DECL_ERROR(210, null_ast_node, "AST node is null")

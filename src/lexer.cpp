@@ -5,14 +5,15 @@
 
 namespace snack {
     std::map<std::string, token_type> patterns = {
-        { "['\"][^']*[']", token_type::string },
+        { "['\"][^'\"]*['\"]", token_type::string },
         { "[A-Za-z][A-Za-z0-9_.]*", token_type::ident },
-        { "[><*=&|-]?[*+\\-=><&>=\\|\\^<]", token_type::op },
+        { "[><\\*=&-+]?[*+\\-=><&>=\\|\\^<]", token_type::op },
         { "([0-9]*[.])?[0-9]+", token_type::number },
         { "[$][0-9a-fA-F]+", token_type::hex_number },
         { "[\\(\\)]", token_type::parentheses },
         { ",", token_type::separator },
-        { ":", token_type::colon }
+        { ":", token_type::colon },
+        { ";", token_type::semicolon }
     };
 
     std::string lexer::read_util(const char stop_char) {

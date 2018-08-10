@@ -68,7 +68,9 @@ namespace snack::ir::backend {
         case opcode::br:
         case opcode::brt:
         case opcode::brf: {
-            ir_bin.write(reinterpret_cast<const char *>(&value), sizeof(size_t));
+            size_t jump_addr = static_cast<size_t>(value);
+
+            ir_bin.write(reinterpret_cast<const char *>(&jump_addr), sizeof(size_t));
             funcs.back().crr_pc += sizeof(size_t);
 
             break;
@@ -431,6 +433,13 @@ namespace snack::ir::backend {
             break;
         }
 
+        case node_type::conditional_loop: {
+            std::shared_ptr<conditional_loop_node> loop = std::dynamic_pointer_cast<conditional_loop_node>(node);
+            build_conditional_loop(func, loop);
+
+            break;
+        }
+
         default: {
             break;
         }
@@ -500,10 +509,46 @@ namespace snack::ir::backend {
         }
     }
 
+    void ir_compiler::build_conditional_loop(function_node_ptr func, std::shared_ptr<conditional_loop_node> node) {
+        for (const auto &init_job : node->get_init_jobs()) {
+            build_node(func, init_job);
+        }
+
+        std::vector<size_t> rewrite_addrs;
+
+        size_t condition_addr = funcs.back().crr_pc;
+
+        for (const auto &cont_condition : node->get_continue_conditions()) {
+            build_condition(func, cont_condition);
+
+            // if one of these conditions failed, it should not continue execution
+            rewrite_addrs.push_back(static_cast<size_t>(ir_bin.tellp()) + 2);
+            emit(opcode::brf, 0);
+        }
+
+        for (const auto &state : node->get_do_block()->get_childrens()) {
+            build_node(func, state);
+        }
+
+        for (const auto &end_job : node->get_end_jobs()) {
+            build_node(func, end_job);
+        }
+
+        emit(opcode::br, condition_addr);
+
+        size_t end_do_block_pc = funcs.back().crr_pc;
+        size_t last_pos = ir_bin.tellp();
+
+        for (const auto &rewrite_addr : rewrite_addrs) {
+            ir_bin.seekp(rewrite_addr);
+            ir_bin.write(reinterpret_cast<const char *>(&end_do_block_pc), sizeof(size_t));
+            ir_bin.seekp(last_pos);
+        }
+    }
+
     void ir_compiler::build_if_else(function_node_ptr func, std::shared_ptr<if_else_node> node) {
         build_condition(func, node->get_condition());
 
-        //emit(opcode::ldcst, 0);
         size_t rewrite_addr = static_cast<size_t>(ir_bin.tellp()) + 2;
         emit(opcode::brf, 0);
 
@@ -556,7 +601,7 @@ namespace snack::ir::backend {
             build_push_hs(func, node->get_lhs());
 
             if (cn->get_op() == caculate_op::logical_and) {
-                // Compare the current node, if it's not good (expression is false),
+                // Come the current node, if it's not good (expression is false),
                 // branch to after the binary
                 //emit(opcode::ldcst, 0);
                 revisit_write = static_cast<size_t>(ir_bin.tellp()) + 2;

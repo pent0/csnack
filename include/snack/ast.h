@@ -51,6 +51,8 @@ namespace snack {
         unit_ref,
         if_else,
         block,
+        conditional_loop,
+        unconditional_loop,
         unknown
     };
 
@@ -327,7 +329,7 @@ namespace snack {
             return unit_name;
         }
     };
-    
+
     class block_node : public stmt_node {
     public:
         block_node(node_ptr parent, token tok);
@@ -354,6 +356,36 @@ namespace snack {
 
         std::shared_ptr<block_node> get_else_block() {
             return else_block;
+        }
+    };
+
+    class conditional_loop_node : public stmt_node {
+        std::vector<node_ptr> continue_conditions;
+
+        std::vector<node_ptr> end_jobs;
+        std::vector<node_ptr> init_jobs;
+
+        std::shared_ptr<block_node> do_block;
+
+        friend class parser;
+
+    public:
+        conditional_loop_node(node_ptr parent, token tok);
+
+        std::shared_ptr<block_node> get_do_block() {
+            return do_block;
+        }
+
+        std::vector<node_ptr> &get_continue_conditions() {
+            return continue_conditions;
+        }
+
+        std::vector<node_ptr> &get_end_jobs() {
+            return end_jobs;
+        }
+
+        std::vector<node_ptr> &get_init_jobs() {
+            return init_jobs;
         }
     };
 }

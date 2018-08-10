@@ -9,7 +9,10 @@ namespace snack::userspace {
         void cos(ir::backend::ir_interpreter_func_context &context);
         void tan(ir::backend::ir_interpreter_func_context &context);
 
-    public : 
+        void fopen(ir::backend::ir_interpreter_func_context &context);
+        void fclose(ir::backend::ir_interpreter_func_context &context);
+
+    public :
         explicit std_unit();
     };
 }

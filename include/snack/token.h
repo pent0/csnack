@@ -16,6 +16,7 @@ namespace snack {
         parentheses,
         separator,
         colon,
+        semicolon,
         eol,
         eof
     };

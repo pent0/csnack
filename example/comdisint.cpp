@@ -15,11 +15,11 @@ const char *test_script = {
     "fn test:\n"
     "    var a = 6\n"
     "    var b = 7\n"
-    "    do:\n"
-    "        print('Hi')\n"
+    "    while a < 24:\n"
+    "       a += 2\n"
+    "       print('{} ', a)\n"
     "\n"
     "fn main:\n"
-    "    if (6):\n"
     "        test()\n"
 };
 

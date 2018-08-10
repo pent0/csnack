@@ -76,6 +76,7 @@ namespace snack::ir::backend {
         void build_function_call(function_node_ptr func, std::shared_ptr<function_call_node> fun);
         void build_if_else(function_node_ptr func, std::shared_ptr<if_else_node> node);
         void build_unary(function_node_ptr func, std::shared_ptr<unary_node> node);
+        void build_conditional_loop(function_node_ptr func, std::shared_ptr<conditional_loop_node> node);
 
         void build_condition(function_node_ptr func, node_ptr node);
         void build_node(function_node_ptr func, node_ptr node);

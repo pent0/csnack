@@ -138,7 +138,6 @@ namespace snack {
 
     std::shared_ptr<node> parser::parse_stmt(node_ptr parent) {
         std::optional<token> tok = code_lexer.peek();
-
         if (!tok) {
             return nullptr;
         }
@@ -168,6 +167,8 @@ namespace snack {
                 return parse_if_else(parent);
             } else if (tok_val == "do") {
                 return parse_do_chain(parent);
+            } else if (tok_val == "for" || tok_val == "while") {
+                return parse_conditional_loop(parent);
             } else if (tok_val == "uses") {
                 if (parent->get_node_type() != node_type::unit) {
                     do_report(error_panic_code::invalid_use, snack::error_level::error,
@@ -197,7 +198,7 @@ namespace snack {
 
                 auto tok_p = code_lexer.peek();
 
-                if (tok_p && tok_p->get_raw_token_string() == "=") {
+                if (tok_p && (tok_p->get_raw_token_string() == "=" || (tok_p->get_raw_token_string().length() >= 2 && tok_p->get_raw_token_string()[1] == '='))) {
                     auto var = get_var(parent, tok->get_raw_token_string());
 
                     if (!var) {
@@ -212,6 +213,8 @@ namespace snack {
                 } else if (tok_p && tok_p->get_raw_token_string() == "(") {
                     return parse_function_call(parent);
                 }
+
+                code_lexer.back();
 
                 return parse_expr(parent);
             }
@@ -509,26 +512,10 @@ namespace snack {
             return nullptr;
         }
 
-        code_lexer.next();
-        tok = code_lexer.get_current_token();
+        ie->if_block = parse_block(ie);
 
-        if (tok && tok->get_token_type() != token_type::indent) {
-            do_report(error_panic_code::indentation_needed, error_level::error, *tok);
+        if (!ie->if_block) {
             return nullptr;
-        }
-
-        ie->if_block = std::make_shared<block_node>(ie, *tok);
-
-        while (code_lexer.get_current_token() && code_lexer.get_current_token()->get_token_type() != token_type::dedent && code_lexer.get_current_token()->get_token_type() != token_type::eof) {
-            node_ptr nd = parse_stmt(ie);
-
-            if (nd) {
-                ie->if_block->add_children(nd);
-            } else {
-                return nullptr;
-            }
-
-            code_lexer.next();
         }
 
         if (code_lexer.peek() && code_lexer.peek()->get_raw_token_string() == "else") {
@@ -542,48 +529,17 @@ namespace snack {
                 return nullptr;
             }
 
-            code_lexer.next();
-            tok = code_lexer.get_current_token();
-
-            if (tok && tok->get_token_type() != token_type::indent) {
-                do_report(error_panic_code::indentation_needed, error_level::error, *tok);
-                return nullptr;
-            }
-
-            ie->else_block = std::make_shared<block_node>(ie, *tok);
-
-            while (code_lexer.get_current_token() && ((code_lexer.get_current_token()->get_token_type() != token_type::dedent) && code_lexer.get_current_token()->get_token_type() != token_type::eof)) {
-                node_ptr nd = parse_stmt(ie);
-
-                if (nd) {
-                    ie->else_block->add_children(nd);
-                } else {
-                    return ie;
-                }
-
-                code_lexer.next();
-            }
+            ie->else_block = parse_block(ie);
         }
+
+        code_lexer.next();
 
         return ie;
     }
 
-    std::shared_ptr<node> parser::parse_do_chain(node_ptr parent) {
-        code_lexer.next();
-        std::shared_ptr<block_node> do_block = std::make_shared<block_node>(parent, *code_lexer.get_current_token());
-
-        code_lexer.next();
-        auto tok = code_lexer.get_current_token();
-
-        if (tok && tok->get_token_type() != token_type::colon) {
-            // Get the do token, since the next token maybe in the line under
-            do_report(error_panic_code::expect_after, error_level::error, *code_lexer.get_last_token(), "':'", "'do'",
-                tok->get_raw_token_string());
-
-            return nullptr;
-        }
-
-        tok = code_lexer.peek();
+    std::shared_ptr<block_node> parser::parse_block(node_ptr parent) {
+        std::shared_ptr<block_node> do_block = std::make_shared<block_node>(parent, *code_lexer.get_last_token());
+        auto tok = code_lexer.peek();
 
         if (tok && tok->get_token_type() != token_type::indent) {
             // Get the do token, since the next token maybe in the line under
@@ -612,6 +568,29 @@ namespace snack {
             return do_block;
         }
 
+        return do_block;
+    }
+
+    std::shared_ptr<node> parser::parse_do_chain(node_ptr parent) {
+        code_lexer.next();
+
+        code_lexer.next();
+        auto tok = code_lexer.get_current_token();
+
+        if (tok && tok->get_token_type() != token_type::colon) {
+            // Get the do token, since the next token maybe in the line under
+            do_report(error_panic_code::expect_after, error_level::error, *code_lexer.get_last_token(), "':'", "'do'",
+                tok->get_raw_token_string());
+
+            return nullptr;
+        }
+
+        std::shared_ptr<block_node> do_block = parse_block(parent);
+
+        if (!do_block) {
+            return nullptr;
+        }
+
         code_lexer.next();
         tok = code_lexer.peek();
 
@@ -631,6 +610,152 @@ namespace snack {
         }
 
         return do_block;
+    }
+
+    std::shared_ptr<conditional_loop_node> parser::parse_conditional_loop(node_ptr parent) {
+        std::shared_ptr<conditional_loop_node> cloop = std::make_shared<conditional_loop_node>(parent, *code_lexer.peek());
+
+        if (code_lexer.peek()->get_raw_token_string() == "while") {
+            code_lexer.next();
+
+            node_ptr condition = parse_stmt(parent);
+
+            if (condition->type != node_type::caculate && condition->type != node_type::number) {
+                do_report(error_panic_code::expect, error_level::error, *code_lexer.get_last_token(), "a condition");
+                return nullptr;
+            }
+
+            cloop->continue_conditions.push_back(std::move(condition));
+
+            code_lexer.next();
+            auto tok = code_lexer.get_current_token();
+
+            if (tok->get_token_type() != token_type::colon) {
+                do_report(error_panic_code::expect_after_got, error_level::error, *tok,
+                    "colon", "for statement", tok->get_raw_token_string());
+
+                return cloop;
+            }
+
+            cloop->do_block = std::move(parse_block(parent));
+
+            code_lexer.next();
+
+            return cloop;
+        }
+
+        code_lexer.next();
+
+        bool end_require_parentheses = false;
+
+        auto tok = code_lexer.peek();
+
+        if (tok->get_raw_token_string() == "(") {
+            code_lexer.next();
+            end_require_parentheses = true;
+        }
+
+        while (tok && tok->get_token_type() != token_type::semicolon && tok->get_token_type() != token_type::eof) {
+            node_ptr decl = std::move(parse_stmt(cloop));
+
+            if (decl)
+                cloop->init_jobs.push_back(decl);
+
+            tok = code_lexer.peek();
+
+            if (tok->get_token_type() == token_type::separator) {
+                code_lexer.next();
+                tok = code_lexer.peek();
+            }
+        }
+
+        if (tok->get_token_type() == token_type::eof) {
+            do_report(error_panic_code::expect_after_got, error_level::error, *code_lexer.get_last_token(),
+                "semicolon", "loop declaration stage", "EOF");
+
+            return nullptr;
+        }
+
+        code_lexer.next();
+        tok = code_lexer.peek();
+
+        while (tok && tok->get_token_type() != token_type::semicolon && tok->get_token_type() != token_type::eof) {
+            node_ptr n = std::move(parse_stmt(cloop));
+
+            if (!n) {
+                return cloop;
+            }
+
+            node_type nt = n->get_node_type();
+
+            if (nt != node_type::caculate && nt != node_type::number) {
+                do_report(error_panic_code::loop_condition_only, error_level::error, *code_lexer.get_last_token());
+
+                return cloop;
+            }
+
+            cloop->continue_conditions.push_back(n);
+
+            tok = code_lexer.peek();
+
+            if (tok->get_token_type() == token_type::separator) {
+                code_lexer.next();
+                tok = code_lexer.peek();
+            }
+        }
+
+        if (tok->get_token_type() == token_type::eof) {
+            do_report(error_panic_code::expect_after_got, error_level::error, *code_lexer.get_last_token(),
+                "semicolon", "loop conditions stage", "EOF");
+
+            return cloop;
+        }
+
+        code_lexer.next();
+        tok = code_lexer.peek();
+
+        while (tok && tok->get_token_type() != token_type::parentheses && tok->get_token_type() != token_type::eof
+            && tok->get_token_type() != token_type::colon) {
+            node_ptr n = std::move(parse_stmt(cloop));
+            node_type nt = n->get_node_type();
+
+            cloop->end_jobs.push_back(n);
+
+            tok = code_lexer.peek();
+
+            if (tok->get_token_type() == token_type::separator) {
+                code_lexer.next();
+                tok = code_lexer.peek();
+            }
+        }
+
+        code_lexer.next();
+        tok = code_lexer.get_current_token();
+
+        if (end_require_parentheses && tok->get_raw_token_string() != ")") {
+            do_report(error_panic_code::expect_got, error_level::error, *tok,
+                "close parantheses", tok->get_raw_token_string());
+
+            return cloop;
+        }
+
+        if (end_require_parentheses && tok->get_raw_token_string() == ")") {
+            code_lexer.next();
+            tok = code_lexer.get_current_token();
+        }
+
+        if (tok->get_token_type() != token_type::colon) {
+            do_report(error_panic_code::expect_after_got, error_level::error, *tok,
+                "colon", "for statement", tok->get_raw_token_string());
+
+            return cloop;
+        }
+
+        cloop->do_block = std::move(parse_block(cloop));
+
+        code_lexer.next();
+
+        return cloop;
     }
 
     std::shared_ptr<var_node> parser::parse_var(node_ptr parent) {
@@ -683,10 +808,7 @@ namespace snack {
         assign->left = std::move(lhs);
 
         std::optional<token> tok = code_lexer.peek();
-
-        if (!tok || tok->get_raw_token_string() != "=") {
-            return nullptr;
-        }
+        std::string op_raw = tok->get_raw_token_string();
 
         code_lexer.next();
 
@@ -721,6 +843,49 @@ namespace snack {
 
                 return nullptr;
             }
+        }
+
+        if (op_raw.length() == 2) {
+            std::shared_ptr<caculate_node> fast_node = std::make_shared<caculate_node>(parent, *code_lexer.get_last_token());
+            fast_node->left = assign->left;
+            fast_node->right = std::move(assign->right);
+
+            switch (op_raw[0]) {
+            case '+': {
+                fast_node->op = caculate_op::add;
+                break;
+            }
+            case '-': {
+                fast_node->op = caculate_op::sub;
+                break;
+            }
+            case '*': {
+                fast_node->op = caculate_op::mul;
+                break;
+            }
+            case '/': {
+                fast_node->op = caculate_op::div;
+                break;
+            }
+            case '&': {
+                fast_node->op = caculate_op::and;
+                break;
+            }
+            case '|': {
+                fast_node->op = caculate_op:: or ;
+                break;
+            }
+            case '^': {
+                fast_node->op = caculate_op:: xor ;
+                break;
+            }
+            default: {
+                assign->right = std::move(fast_node->right);
+                return assign;
+            }
+            }
+
+            assign->right = std::move(fast_node);
         }
 
         return assign;

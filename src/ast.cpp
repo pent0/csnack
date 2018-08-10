@@ -132,4 +132,9 @@ namespace snack {
         : stmt_node(parent, node_type::block, tok) {
 
     }
+
+    conditional_loop_node::conditional_loop_node(node_ptr parent, token tok)
+        : stmt_node(parent, node_type::conditional_loop, tok) {
+
+    }
 }

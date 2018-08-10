@@ -56,7 +56,9 @@ namespace snack {
 
         std::shared_ptr<var_node> parse_var(node_ptr parent);
         std::shared_ptr<if_else_node> parse_if_else(node_ptr parent);
+        std::shared_ptr<conditional_loop_node> parse_conditional_loop(node_ptr parent);
         std::shared_ptr<node> parse_do_chain(node_ptr parent);
+        std::shared_ptr<block_node> parse_block(node_ptr parent);
 
         std::shared_ptr<assign_node> parse_assign_node(node_ptr parent, var_node_ptr lhs);
         std::shared_ptr<function_call_node> parse_function_call(node_ptr parent);
