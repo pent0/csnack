@@ -26,11 +26,13 @@ namespace snack::ir::backend {
         enum {
             none,
             num,
-            str
+            str,
+            ref
         } type;
 
         std::string str_data;
         long double num_data;
+        uint64_t ref_id;
 
         std::string associated_name;
 
@@ -47,6 +49,8 @@ namespace snack::ir::backend {
             : num_data(num_data)
             , type(num) {}
     };
+    
+    class ir_interpreter_ref_manager;
 
     struct ir_interpreter_func_context {
         std::array<ir_element, 200> local_slots;
@@ -59,7 +63,77 @@ namespace snack::ir::backend {
         std::string func_name;
         userspace::unit *owning_unit;
 
+        ir_interpreter_ref_manager *ref_manager;
+
         size_t pc;
+
+        void push(ir_element &el);
+        void push(long double val);
+        void push(const std::string &val);
+
+        ir_element pop();
+    };
+
+    enum class ir_object_base_type {
+        oop,
+        array
+    };
+
+    class ir_object_base {
+    protected:
+        ir_object_base_type type;
+
+        uint64_t id;
+        uint32_t ref_counter;
+
+        ir_object_base(const ir_object_base_type type);
+
+        friend class ir_interpreter_ref_manager;
+
+    public:
+        explicit ir_object_base();
+        virtual ~ir_object_base() {}
+
+        ir_object_base_type get_type() const {
+            return type;
+        }
+    };
+
+    class ir_oop_object : public ir_object_base {
+    protected:
+        std::unordered_map<uint32_t, ir_element> fields;
+
+    public:
+        explicit ir_oop_object();
+    };
+
+    class ir_array : public ir_object_base {
+        std::vector<ir_element> elements;
+
+    public:
+        explicit ir_array();
+
+        ir_element &get_element(int idx);
+        size_t get_array_length();
+    };
+
+    using ir_object_base_ptr = std::shared_ptr<ir_object_base>;
+
+    class ir_interpreter_ref_manager {
+        std::unordered_map<uint64_t, ir_object_base_ptr> objects;
+        mutable std::atomic<uint64_t> ref_id;
+
+    protected:
+        uint64_t new_id() const;
+
+    public:
+        explicit ir_interpreter_ref_manager();
+
+        uint64_t make_new_array();
+        ir_object_base_ptr get_obj(uint64_t id);
+
+        void do_push(uint64_t ref);
+        void do_pop(uint64_t ref);
     };
 
     class ir_interpreter {
@@ -70,6 +144,7 @@ namespace snack::ir::backend {
         snack::error_manager *err_manager;
 
         ir_interpreter_func_context *last_context;
+        ir_interpreter_ref_manager ref_manager;
 
         friend class userspace::interpreted_unit;
         friend class userspace::external_unit;
@@ -79,8 +154,11 @@ namespace snack::ir::backend {
 
         void ldcst(ir_interpreter_func_context &context);
         void ldlc(ir_interpreter_func_context &context);
+        void ldarg(ir_interpreter_func_context &context);
+
         void ldcststr(ir_interpreter_func_context &context);
         void strlc(ir_interpreter_func_context &context);
+        void strarg(ir_interpreter_func_context &context);
 
         void add(ir_interpreter_func_context &context);
         void sub(ir_interpreter_func_context &context);
@@ -118,12 +196,21 @@ namespace snack::ir::backend {
 
         void pop(ir_interpreter_func_context &context);
 
-        void do_opcode();
+        void newarr(ir_interpreter_func_context &context);
+        void strelm(ir_interpreter_func_context &context);
+        void ldelm(ir_interpreter_func_context &context);
 
+        void ret(ir_interpreter_func_context &context);
+
+        void do_opcode();
         void init_opcode_table();
 
     public:
         explicit ir_interpreter(snack::error_manager &err_mngr, snack::userspace::unit_manager &manager);
         void interpret();
+
+        ir_interpreter_ref_manager *get_ref_manager() {
+            return &ref_manager;
+        }
     };
 }

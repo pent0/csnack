@@ -14,9 +14,11 @@ namespace snack {
         ident,
         op,
         parentheses,
+        square_bracket,
         separator,
         colon,
         semicolon,
+        keyword,
         eol,
         eof
     };

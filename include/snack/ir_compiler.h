@@ -78,9 +78,13 @@ namespace snack::ir::backend {
         void build_unary(function_node_ptr func, std::shared_ptr<unary_node> node);
         void build_conditional_loop(function_node_ptr func, std::shared_ptr<conditional_loop_node> node);
 
+        void build_array_push(function_node_ptr func, std::shared_ptr<array_node> node, uint32_t arr_var_index);
+        void build_new_object(function_node_ptr func, std::shared_ptr<new_object_node> node, uint32_t var_index);
+
         void build_condition(function_node_ptr func, node_ptr node);
         void build_node(function_node_ptr func, node_ptr node);
         void build_push_hs(function_node_ptr func, node_ptr node);
+        void build_ret(function_node_ptr func, std::shared_ptr<return_node> node);
 
         void do_report(error_panic_code code, error_level level, node_ptr node);
         void do_report(error_panic_code code, error_level level, node_ptr node, const std::string &arg0);

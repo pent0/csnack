@@ -51,7 +51,7 @@ namespace snack::ir::frontend {
         case opcode::ble: 
         case opcode::br: 
         case opcode::brt: 
-        case opcode::brf: {
+        case opcode::brf:  {
             size_t off = 0;
             ir_bin.read(reinterpret_cast<char *>(&off), sizeof(size_t));
 

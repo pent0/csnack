@@ -174,6 +174,35 @@ namespace snack::ir::backend {
         emit(opcode::endmet);
     }
 
+    void ir_compiler::build_array_push(function_node_ptr func, std::shared_ptr<array_node> node, uint32_t arr_var_index) {
+        for (size_t i = 0; i < node->get_init_elements().size(); i++) {
+            emit(opcode::ldlc, arr_var_index);
+            emit(opcode::ldcst, i);
+
+            build_push_hs(func, node->get_init_elements()[i]);
+
+            emit(opcode::strelm);
+        }
+    }
+
+    void ir_compiler::build_new_object(function_node_ptr func, std::shared_ptr<new_object_node> node, uint32_t var_index) {
+        switch (node->get_new_object_request()->get_node_type()) {
+        case node_type::array: {
+            emit(opcode::newarr);
+            emit(opcode::strlc, var_index);
+
+            build_array_push(func, std::dynamic_pointer_cast<array_node>(node->get_new_object_request()), var_index);
+
+            emit(opcode::ldlc, var_index);
+
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+
     void ir_compiler::build_push_hs(function_node_ptr func, node_ptr node) {
         if (node == nullptr) {
             return;
@@ -196,18 +225,53 @@ namespace snack::ir::backend {
             break;
         }
 
-        case node_type::var: {
+        case node_type::var:
+        case node_type::array_access: {
+            std::shared_ptr<array_access_node> v = std::dynamic_pointer_cast<array_access_node>(node);
+            node_type nt = node->get_node_type();
+
+            auto var_idx = std::find(func->get_local_vars().begin(), func->get_local_vars().end(),
+                nt == node_type::var ? node : v->get_var());
+
+            size_t idx = 0;
+            bool is_arg = false;
+
+            bool found = false;
+
             for (uint8_t i = 0; i < func->get_args().size(); i++) {
-                if (func->get_args()[i] == node) {
-                    emit(opcode::ldarg, i);
+                if ((nt == node_type::var && func->get_args()[i] == node)
+                    || (nt == node_type::array_access && func->get_args()[i] == v->get_var())) {
+                    idx = i;
+                    is_arg = true;
+                    found = true;
+
+                    break;
                 }
             }
 
-            auto var_idx = std::find(func->get_local_vars().begin(), func->get_local_vars().end(),
-                node);
+            if (!found) {
+                if (var_idx == func->get_local_vars().end()) {
+                    break;
+                }
 
-            if (var_idx != func->get_local_vars().end()) {
-                emit(opcode::ldlc, var_idx - func->get_local_vars().begin());
+                idx = var_idx - func->get_local_vars().begin();
+            }
+
+            if (node->get_node_type() == node_type::var) {
+                if (is_arg) {
+                    emit(opcode::ldarg, idx);
+                } else {
+                    emit(opcode::ldlc, idx);
+                }
+            } else {
+                if (is_arg) {
+                    emit(opcode::ldarg, idx);
+                } else {
+                    emit(opcode::ldlc, idx);
+                }
+
+                build_push_hs(func, v->get_index());
+                emit(opcode::ldelm);
             }
 
             break;
@@ -303,23 +367,83 @@ namespace snack::ir::backend {
     }
 
     void ir_compiler::build_assign(function_node_ptr func, std::shared_ptr<assign_node> node) {
-        build_push_hs(func, node->get_rhs());
+        node_type ltr = node->get_lhs()->get_node_type();
 
-        switch (node->get_lhs()->get_node_type()) {
-        case node_type::var: {
+        switch (ltr) {
+        case node_type::var:
+        case node_type::array_access: {
+            std::shared_ptr<array_access_node> v = std::dynamic_pointer_cast<array_access_node>(node->get_lhs());
+
+            auto var_idx = std::find(func->get_local_vars().begin(), func->get_local_vars().end(),
+                ltr == node_type::var ? node->get_lhs() : v->get_var());
+
+            size_t idx = 0;
+            bool is_arg = false;
+            bool found = false;
+
+            node_type nt = node->get_node_type();
+
             for (uint8_t i = 0; i < func->get_args().size(); i++) {
-                if (func->get_args()[i] == node->get_lhs()) {
-                    emit(opcode::strarg, i);
+                if ((nt == node_type::var && func->get_args()[i] == node->get_lhs())
+                    || (nt == node_type::array_access && func->get_args()[i] == v->get_var())) {
+                    idx = i;
+                    is_arg = true;
+                    found = true;
+
+                    break;
                 }
             }
 
-            auto var_idx = std::find(func->get_local_vars().begin(), func->get_local_vars().end(),
-                node->get_lhs());
+            if (!found) {
+                if (var_idx == func->get_local_vars().end()) {
+                    break;
+                }
 
-            if (var_idx != func->get_local_vars().end()) {
-                emit(opcode::strlc, var_idx - func->get_local_vars().begin());
+                idx = var_idx - func->get_local_vars().begin();
             }
+
+            if (ltr == node_type::array_access) {
+                if (!is_arg)
+                    emit(opcode::ldlc, idx);
+                else
+                    emit(opcode::ldarg, idx);
+
+                std::shared_ptr<array_access_node> v = std::dynamic_pointer_cast<array_access_node>(node->get_lhs());
+
+                build_push_hs(func, v->get_index());
+            }
+
+            switch (node->get_rhs()->get_node_type()) {
+            case node_type::new_object: {
+                build_new_object(func, std::dynamic_pointer_cast<new_object_node>(node->get_rhs()), idx);
+                break;
+            }
+
+            case node_type::array: {
+                build_array_push(func, std::dynamic_pointer_cast<array_node>(node->get_rhs()), idx);
+                break;
+            }
+
+            default: {
+                build_push_hs(func, node->get_rhs());
+                break;
+            }
+            }
+
+            if (ltr == node_type::var) {
+                if (!is_arg)
+                    emit(opcode::strlc, idx);
+                else
+                    emit(opcode::strarg, idx);
+            } else {
+                emit(opcode::strelm);
+            }
+
+            break;
         }
+
+        default:
+            break;
         }
     }
 
@@ -437,6 +561,11 @@ namespace snack::ir::backend {
             std::shared_ptr<conditional_loop_node> loop = std::dynamic_pointer_cast<conditional_loop_node>(node);
             build_conditional_loop(func, loop);
 
+            break;
+        }
+
+        case node_type::ret: {
+            build_ret(func, std::dynamic_pointer_cast<return_node>(node));
             break;
         }
 
@@ -627,6 +756,11 @@ namespace snack::ir::backend {
         } else {
             build_push_hs(func, node);
         }
+    }
+
+    void ir_compiler::build_ret(function_node_ptr func, std::shared_ptr<return_node> node) {
+        build_push_hs(func, node->get_result());
+        emit(opcode::ret);
     }
 
     std::string ir_compiler::get_compile_binary() {

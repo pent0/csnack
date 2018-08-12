@@ -53,6 +53,9 @@ namespace snack {
         block,
         conditional_loop,
         unconditional_loop,
+        array,
+        array_access,
+        new_object,
         unknown
     };
 
@@ -309,15 +312,6 @@ namespace snack {
         null_node(node_ptr parent, token tok);
     };
 
-    class return_node : public stmt_node {
-        node_ptr return_expr;
-
-        friend class parser;
-
-    public:
-        return_node(node_ptr parent, token tok);
-    };
-
     class unit_reference_node : public stmt_node {
         std::string unit_name;
         friend class parser;
@@ -386,6 +380,62 @@ namespace snack {
 
         std::vector<node_ptr> &get_init_jobs() {
             return init_jobs;
+        }
+    };
+
+    class array_node : public node {
+        std::vector<node_ptr> init_elements;
+
+        friend class parser;
+
+    public:
+        array_node(node_ptr parent, token tok);
+
+        std::vector<node_ptr> &get_init_elements() {
+            return init_elements;
+        }
+    };
+
+    class array_access_node : public node {
+        node_ptr index;
+        node_ptr var;
+
+        friend class parser;
+
+    public:
+        array_access_node(node_ptr parent, token tok);
+
+        node_ptr get_index() {
+            return index;
+        }
+
+        node_ptr get_var() {
+            return var;
+        }
+    };
+
+    class new_object_node : public stmt_node {
+        node_ptr object_request;
+
+        friend class parser;
+
+    public:
+        new_object_node(node_ptr parent, token tok);
+
+        node_ptr get_new_object_request() {
+            return object_request;
+        }
+    };
+
+    class return_node : public stmt_node {
+        node_ptr result;
+        friend class parser;
+
+    public:
+        return_node(node_ptr parent, token tok);
+
+        node_ptr get_result() {
+            return result;
         }
     };
 }

@@ -4,17 +4,36 @@
 #include <regex>
 
 namespace snack {
-    std::map<std::string, token_type> patterns = {
-        { "['\"][^'\"]*['\"]", token_type::string },
-        { "[A-Za-z][A-Za-z0-9_.]*", token_type::ident },
-        { "[><\\*=&-+]?[*+\\-=><&>=\\|\\^<]", token_type::op },
-        { "([0-9]*[.])?[0-9]+", token_type::number },
-        { "[$][0-9a-fA-F]+", token_type::hex_number },
-        { "[\\(\\)]", token_type::parentheses },
-        { ",", token_type::separator },
-        { ":", token_type::colon },
-        { ";", token_type::semicolon }
-    };
+    void lexer::do_report(int error_code, error_level level, token tok) {
+        if (err_mngr) {
+            err_mngr->throw_error(error_category::lexer, level, error_code,
+                tok.get_column(), tok.get_row());
+        }
+    }
+
+    void lexer::do_report(int error_code, error_level level, token tok, const std::string &arg0) {
+        if (err_mngr) {
+            err_mngr->throw_error(error_category::lexer, level, error_code,
+                tok.get_column(), tok.get_row(), arg0);
+        }
+    }
+
+    void lexer::do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1,
+        const std::string &arg2) {
+        if (err_mngr) {
+            std::string temp_arr[] = { arg0, arg1, arg2 };
+
+            err_mngr->throw_error(error_category::parser, level, error_code,
+                tok.get_column(), tok.get_row(), temp_arr, 3);
+        }
+    }
+
+    void lexer::do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1) {
+        if (err_mngr) {
+            err_mngr->throw_error(error_category::parser, level, error_code,
+                tok.get_column(), tok.get_row(), arg0, arg1);
+        }
+    }
 
     std::string lexer::read_util(const char stop_char) {
         std::string result;
@@ -52,7 +71,19 @@ namespace snack {
         return result;
     }
 
-    token lexer::generate_ident() {
+    std::string lexer::read_while(const char stop_char) {
+        std::string result;
+        char single;
+
+        while (stream.peek() == stop_char) {
+            stream.read(&single, 1);
+            result += single;
+        }
+
+        return result;
+    }
+
+    token lexer::generate_indent() {
         token new_token;
 
         new_token.column = 1;
@@ -76,28 +107,16 @@ namespace snack {
         return new_token;
     }
 
-    void lexer::generate_ident_dedent() {
+    void lexer::generate_indent_dedent() {
         size_t i = 0;
 
         while (crr_line[i] == ' ')
             i++;
 
-        while (crr_line.length() > 0 && crr_line[i] == '#') {
-            std::getline(stream, crr_line);
-
-            line++;
-            col = 1;
-
-            i = 0;
-            
-            while (crr_line[i] == ' ')
-                i++;
-        }
-
         size_t indent_level = i;
 
         if (indent_level > indent_stack.top()) {
-            token_list.push_back(std::move(generate_ident()));
+            token_list.push_back(std::move(generate_indent()));
             indent_stack.push(indent_level);
         } else if (indent_level < indent_stack.top()) {
             while (indent_level < indent_stack.top()) {
@@ -109,68 +128,357 @@ namespace snack {
         col += i;
     }
 
+    void lexer::lex_string() {
+        token tok;
+        tok.type = token_type::string;
+        tok.column = stream.tellg();
+        tok.row = line;
+
+        std::string raw_token_string = "";
+        char capture_seq;
+        stream.read(&capture_seq, 1);
+
+        raw_token_string += read_util(capture_seq);
+        col += raw_token_string.length() + 2;
+
+        char temp;
+        stream.read(&temp, 1);
+
+        if (raw_token_string.size() >= 3) {
+            while (raw_token_string[raw_token_string.length() - 2] == '\\') {
+                raw_token_string += read_util(capture_seq);
+                col += raw_token_string.length() + 2;
+
+                char temp;
+                stream.read(&temp, 1);
+            }
+        }
+
+        auto pos = raw_token_string.find_first_of('\\');
+
+        while (pos != std::string::npos) {
+            if (raw_token_string[pos - 1] != '\\' || (raw_token_string.length() > pos - 1 && raw_token_string[pos + 1] != '\\')) {
+                // Missing closing quote lexical warning
+                do_report(error_panic_code::missing_closing_quote, error_level::warn, tok);
+            }
+
+            raw_token_string.erase(pos);
+        }
+
+        tok.token_data_raw = raw_token_string;
+
+        token_list.push_back(tok);
+    }
+
+    void lexer::lex_number() {
+        token tok;
+        tok.type = token_type::number;
+        tok.column = col + 1;
+        tok.row = line;
+
+        bool hex = (stream.peek() == '$') ? true : false;
+        bool dot_found = false;
+
+        if (hex) {
+            tok.type = token_type::hex_number;
+        }
+
+        std::string raw_num_string;
+
+        if (hex) {
+            char temp;
+            stream.read(&temp, 1);
+
+            temp = stream.peek();
+            while ((temp >= '0' && temp <= '9') || (temp >= 'A' && temp <= 'F') || (temp >= 'a' && temp <= 'f')
+                || temp == '.') {
+                stream.read(&temp, 1);
+
+                if (temp == '.' && dot_found) {
+                    // error
+                    do_report(error_panic_code::invalid_number_dot, error_level::error,
+                        tok);
+                } else {
+                    dot_found = true;
+                }
+
+                raw_num_string += temp;
+                temp = stream.peek();
+            }
+
+            col += raw_num_string.length() + 1;
+        } else {
+            char temp = stream.peek();
+
+            while (temp == '.' || (temp >= '0' && temp <= '9')) {
+                stream.read(&temp, 1);
+
+                if (temp == '.' && dot_found) {
+                    // error
+                    do_report(error_panic_code::invalid_number_dot, error_level::error,
+                        tok);
+                } else {
+                    dot_found = true;
+                }
+
+                raw_num_string += temp;
+                temp = stream.peek();
+            }
+
+            col += raw_num_string.length();
+        }
+
+        tok.token_data_raw = raw_num_string;
+
+        token_list.push_back(tok);
+    }
+
+    void lexer::lex_operator() {
+        token tok;
+        tok.column = col + 1;
+        tok.row = line;
+        tok.type = token_type::op;
+
+        char temp = stream.peek();
+        std::string op;
+
+        while (temp == '+' || temp == '-' || temp == '*' || temp == '//' || temp == '&' || temp == '|'
+            || temp == '^' || temp == '>' || temp == '=' || temp == '<' || temp == '~' || temp == '!') {
+            stream.read(&temp, 1);
+
+            op += temp;
+            temp = stream.peek();
+        }
+
+        tok.token_data_raw = op;
+        col += op.length();
+
+        token_list.push_back(tok);
+    }
+
+    std::vector<std::string> keywords = {
+        "new",
+        "var",
+        "array",
+        "object",
+        "fn",
+        "ret",
+        "for",
+        "while",
+        "do",
+        "unless",
+        "uses",
+        "if"
+    };
+
+    void lexer::lex_ident() {
+        token tok;
+
+        tok.column = col + 1;
+        tok.row = line;
+        tok.type = token_type::ident;
+
+        char c = stream.peek();
+        std::string ident;
+
+        while ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || c == '$') {
+            stream.read(&c, 1);
+
+            ident += c;
+            c = stream.peek();
+        }
+
+        tok.token_data_raw = ident;
+        col += ident.length();
+
+        auto keyword = std::find(keywords.begin(), keywords.end(), ident);
+        if (keyword != keywords.end()) {
+            tok.type = token_type::keyword;
+        }
+
+        token_list.push_back(tok);
+    }
+
     void lexer::lex_line() {
-        line += 1;
         col = 1;
 
-        generate_ident_dedent();
+        stream = std::istringstream();
+        stream.str(crr_line);
 
-        std::map<size_t, std::pair<std::string, token_type>> matches;
-
-        for (const auto &pattern : patterns) {
-            std::regex r(pattern.first);
-
-            auto words_begin = std::sregex_iterator(crr_line.begin(), crr_line.end(), r);
-            auto words_end = std::sregex_iterator();
-
-            // No look behind so this is painful
-            std::string last_string = "";
-
-            for (auto it = words_begin; it != words_end; ++it) {
-                std::string raw = it->str();
-                token_type type = pattern.second;
-
-                if (pattern.second == token_type::string) {
-                    raw = raw.substr(1, raw.length() - 2);
-                } else if (pattern.second == token_type::hex_number) {
-                    raw = raw.substr(1, raw.length() - 1);
-                    raw = std::to_string(std::stoul(raw, nullptr, 16));
-
-                    type = token_type::number;
-                } 
-
-                matches[it->position()] = make_pair(raw, type);
-            }
+        if (!ignore_indent_dendent) {
+            generate_indent_dedent();
         }
 
-        // Filter all mismatch identifiers
-        std::regex r("['\"][^']*[']");
+        stream.seekg(col - 1);
 
-        auto words_begin = std::sregex_iterator(crr_line.begin(), crr_line.end(), r);
-        auto words_end = std::sregex_iterator();
-
-        for (auto it = words_begin; it != words_end; it++) {
-            auto res = std::find_if(matches.begin(), matches.end(),
-                [&](auto pair) { return (pair.second.second == token_type::ident) && 
-                (it->position() <= pair.first) && (pair.first < it->position() + it->str().length()); });
-
-            while (res != matches.end()) {
-                matches.erase(res);
-                res = std::find_if(matches.begin(), matches.end(),
-                    [&](auto pair) { return (pair.second.second == token_type::ident) &&
-                    (it->position() <= pair.first) && (pair.first < it->position() + it->str().length()); });
+        while (!stream.eof()) {
+            switch (stream.peek()) {
+            case '\'':
+            case '"': {
+                lex_string();
+                break;
             }
-        }
 
-        for (const auto &match : matches) {
-            token new_token;
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '$': {
+                lex_number();
+                break;
+            }
 
-            new_token.column = match.first + 1;
-            new_token.row = line;
-            new_token.type = match.second.second;
-            new_token.token_data_raw = match.second.first;
+            case '(':
+            case ')': {
+                token tok;
+                tok.type = token_type::parentheses;
+                tok.column = col;
+                tok.row = line;
 
-            token_list.push_back(new_token);
+                char eat = 0;
+                stream.read(&eat, 1);
+
+                tok.token_data_raw = eat;
+
+                if (eat == '(') {
+                    ignore_indent_dendent = true;
+                } else {
+                    ignore_indent_dendent = false;
+                }
+
+                col += 1;
+
+                token_list.push_back(tok);
+
+                break;
+            }
+
+            case ' ': {
+                std::string space = read_while(stream.peek());
+                col += space.length();
+
+                break;
+            }
+
+            case '\t':
+            case '\n': {
+                char temp;
+                stream.read(&temp, 1);
+
+                col += 1;
+                break;
+            }
+
+            case '[':
+            case ']': {
+                token tok;
+                tok.type = token_type::square_bracket;
+                tok.column = col;
+                tok.row = line;
+
+                char eat = 0;
+                stream.read(&eat, 1);
+
+                tok.token_data_raw = eat;
+
+                token_list.push_back(tok);
+                break;
+            }
+
+            case '-':
+            case '+':
+            case '*':
+            case '//':
+            case '&':
+            case '^':
+            case '|':
+            case '=':
+            case '>':
+            case '<':
+            case '~':
+            case '!': {
+                lex_operator();
+                break;
+            }
+
+            case ',': {
+                token tok;
+                tok.type = token_type::separator;
+                tok.column = col;
+                tok.row = line;
+
+                char eat = 0;
+                stream.read(&eat, 1);
+
+                tok.token_data_raw = eat;
+
+                token_list.push_back(tok);
+
+                break;
+            }
+
+            case ';': {
+                token tok;
+                tok.type = token_type::semicolon;
+                tok.column = col;
+                tok.row = line;
+
+                char eat = 0;
+                stream.read(&eat, 1);
+
+                tok.token_data_raw = eat;
+
+                token_list.push_back(tok);
+
+                break;
+            }
+
+            case ':': {
+                token tok;
+                tok.type = token_type::colon;
+                tok.column = col;
+                tok.row = line;
+
+                char eat = 0;
+                stream.read(&eat, 1);
+
+                tok.token_data_raw = eat;
+
+                token_list.push_back(tok);
+
+                break;
+            }
+
+            default: {
+                auto c = stream.peek();
+
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
+                    lex_ident();
+                    break;
+                }
+
+                if (c != -1) {
+                    token tok;
+                    tok.type = token_type::colon;
+                    tok.column = col;
+                    tok.row = line;
+
+                    do_report(error_panic_code::unrecognize_token, error_level::critical, tok);
+
+                    char temp;
+                    stream.read(&temp, 1);
+
+                }
+
+                break;
+            }
+            }
         }
     }
 
@@ -182,7 +490,7 @@ namespace snack {
     }
 
     lexer::lexer(snack::error_manager &mngr, std::istringstream &source_stream)
-        : stream(std::move(source_stream))
+        : global_stream(std::move(source_stream))
         , line(0)
         , col(1)
         , token_pointer(-1)
@@ -214,11 +522,19 @@ namespace snack {
         token_pointer++;
 
         if (token_pointer == 0 || token_pointer >= token_list.size() - 1) {
-            std::getline(stream, crr_line);
+            line += 1;
 
-            lex_line();
+            std::getline(global_stream, crr_line);
 
-            if (stream.eof()) {
+            while (!global_stream.eof() && (crr_line.length() == 0 || crr_line.find_first_not_of("\n\t ") == std::string::npos)) {
+                line += 1;
+                std::getline(global_stream, crr_line);
+            }
+
+            if (crr_line.length() > 0)
+                lex_line();
+
+            if (global_stream.eof()) {
                 token new_token;
 
                 new_token.row = line + 1;

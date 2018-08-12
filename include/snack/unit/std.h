@@ -12,6 +12,8 @@ namespace snack::userspace {
         void fopen(ir::backend::ir_interpreter_func_context &context);
         void fclose(ir::backend::ir_interpreter_func_context &context);
 
+        void length(ir::backend::ir_interpreter_func_context &context);
+
     public :
         explicit std_unit();
     };

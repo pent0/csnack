@@ -67,6 +67,7 @@ namespace snack::userspace {
         function.ir_bin = ir_bin + functions[idx].addr;
         function.ir_global_bin = ir_bin;
         function.owning_unit = this;
+        function.ref_manager = interpreter->get_ref_manager();
 
         interpreter->func_contexts.push(std::move(function));
 

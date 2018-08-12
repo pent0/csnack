@@ -12,15 +12,22 @@
 const char *test_script = {
     "uses std\n"
     "\n"
+    "fn max(a, b):\n"
+    "    if a > b:\n"
+    "        ret a\n"
+    "\n"
+    "    ret b\n"
+    "\n"
     "fn test:\n"
     "    var a = 6\n"
-    "    var b = 7\n"
-    "    while a < 24:\n"
-    "       a += 2\n"
-    "       print('{} ', a)\n"
+    "    var b = 7 + max(5, 6)\n"
+    "    var c = new array(12, 15, 27)\n"
+    "    for var i = 0; i < length(c); i+=1:\n"
+    "       print('{} ', c[i])"
     "\n"
     "fn main:\n"
-    "        test()\n"
+    "    test()\n"
+    "\n"
 };
 
 void error_manager_test() {

@@ -31,6 +31,8 @@
 namespace snack {
     class lexer {
         std::istringstream stream;
+        std::istringstream global_stream;
+
         std::vector<token> token_list;
 
         size_t line;
@@ -43,8 +45,10 @@ namespace snack {
 
         snack::error_manager *err_mngr;
 
+        bool ignore_indent_dendent = false;
+
     protected:
-        token generate_ident();
+        token generate_indent();
         token generate_dedent();
 
         std::string read_util(const char stop_char);
@@ -53,8 +57,19 @@ namespace snack {
 
         std::string read_while(const char stop_char);
 
-        void generate_ident_dedent();
+        void generate_indent_dedent();
         void lex_line();
+
+        void lex_string();
+        void lex_number();
+        void lex_ident();
+        void lex_operator();
+
+        void do_report(int error_code, error_level level, token tok);
+        void do_report(int error_code, error_level level, token tok, const std::string &arg0);
+        void do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1);
+        void do_report(int error_code, error_level level, token tok, const std::string &arg0, const std::string &arg1,
+            const std::string &arg2);
 
     public:
         explicit lexer();

@@ -19,6 +19,9 @@ DECL_ERROR(32, expect_after_got, "Expected {} after {}, got {}")
 DECL_ERROR(33, invalid_unary, "Invalid unary type")
 DECL_ERROR(34, loop_condition_only, "Only conditions are allowed in stage 2 of for-loop statement.")
 DECL_ERROR(35, expect, "Expect {}")
+DECL_ERROR(36, missing_closing_quote, "Missing closing quote")
+DECL_ERROR(37, invalid_number_dot, "Invalid floating pointer number constant, there is more than dots in the number.")
+DECL_ERROR(38, unrecognize_token, "Unrecoginize lexing token")
 
 // This error should be in debug compiler only
 DECL_ERROR(210, null_ast_node, "AST node is null")

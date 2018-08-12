@@ -10,5 +10,3 @@
     - Compiler, compile AST into SIRs
     - Decompiler, which takes SIR binary and decompile them to SIRs
     - Interpreter, which interprets SIR binary until the call stack is wiped out.
-
-- This markdown node will do a brief explaination of them:

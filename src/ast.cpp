@@ -137,4 +137,19 @@ namespace snack {
         : stmt_node(parent, node_type::conditional_loop, tok) {
 
     }
+
+    array_node::array_node(node_ptr parent, token tok)
+        : node(parent, node_type::array, tok) {
+
+    }
+
+    new_object_node::new_object_node(node_ptr parent, token tok)
+        : stmt_node(parent, node_type::new_object, tok) {
+
+    }
+
+    array_access_node::array_access_node(node_ptr parent, token tok)
+        : node(parent, node_type::array_access, tok) {
+
+    }
 }
