@@ -58,7 +58,10 @@ namespace snack {
         std::shared_ptr<if_else_node> parse_if_else(node_ptr parent);
         std::shared_ptr<conditional_loop_node> parse_conditional_loop(node_ptr parent);
         std::shared_ptr<node> parse_do_chain(node_ptr parent);
+        
         std::shared_ptr<block_node> parse_block(node_ptr parent);
+        void parse_provide_block(node_ptr parent, std::shared_ptr<block_node> &node);
+
         std::shared_ptr<array_node> parse_array(node_ptr parent);
         std::shared_ptr<new_object_node> parse_new_object(node_ptr parent);
         std::shared_ptr<node> parse_ident_based(node_ptr parent);
@@ -71,6 +74,8 @@ namespace snack {
         string_node_ptr make_string(const std::string &str);
 
         var_node_ptr get_var(node_ptr parent, const std::string &ident_name);
+        var_node_ptr get_var_nearest_scope(node_ptr parent, const std::string &ident_name);
+
         function_node_ptr get_function(const std::string &func_name, size_t arg_count);
 
         void do_parsing();

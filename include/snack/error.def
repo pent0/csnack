@@ -7,7 +7,7 @@ DECL_ERROR(2,  str_invalid_op, "Invalid binary operation with string. Can only a
 DECL_ERROR(3,  stmt_unable_parse, "Unable to parse statement")
 DECL_ERROR(22, expect_got, "Expected {}, got {}")
 DECL_ERROR(23, expect_after, "Expected identfier after {}")
-DECL_ERROR(24, var_declared, "Variable {} already declared")
+DECL_ERROR(24, var_declared, "Variable {} already declared in the current scope")
 DECL_ERROR(25, var_not_found, "Variable {} not found")
 DECL_ERROR(26, indentation_needed, "An indentation is needed at the start of a function or block declaration")
 DECL_ERROR(27, dedentation_needed, "A dedentation is needed at the end of a function or block declaration")

@@ -81,25 +81,73 @@ namespace snack {
         // traverse node until get
         node_ptr crr = parent;
 
-        while (crr && crr->type != node_type::function) {
+        while ((crr && crr->type != node_type::function) && (crr->type != node_type::block)) {
             crr = crr->parent;
         }
 
         if (crr && crr->type == node_type::function) {
             function_node_ptr func = std::dynamic_pointer_cast<function_node>(crr);
 
-            auto &res = std::find_if(func->local_vars.begin(), func->local_vars.end(),
+            auto &res = std::find_if(func->func_scope_vars.begin(), func->func_scope_vars.end(),
                 [&](var_node_ptr var) { return var->var_name == ident_name; });
 
-            if (res == func->local_vars.end()) {
-                auto &res = std::find_if(vars.begin(), vars.end(),
-                    [&](var_node_ptr var) { return var->var_name == ident_name; });
+            if (res == func->func_scope_vars.end()) {
+                return get_var(crr->parent, ident_name);
+            }
 
-                if (res == vars.end()) {
-                    return nullptr;
-                }
+            return *res;
+        } else if (crr && crr->type == node_type::block) {
+            std::shared_ptr<block_node> block = std::dynamic_pointer_cast<block_node>(crr);
 
-                return *res;
+            auto &res = std::find_if(block->get_local_block_vars().begin(), block->get_local_block_vars().end(),
+                [&](var_node_ptr var) { return var->var_name == ident_name; });
+
+            if (res == block->get_local_block_vars().end()) {
+                return get_var(crr->parent, ident_name);
+            }
+
+            return *res;
+        } else {
+            auto &res = std::find_if(vars.begin(), vars.end(),
+                [&](var_node_ptr var) { return var->var_name == ident_name; });
+
+            if (res == vars.end()) {
+                return nullptr;
+            }
+
+            return *res;
+        }
+
+        return nullptr;
+    }
+
+    var_node_ptr parser::get_var_nearest_scope(node_ptr parent, const std::string &ident_name) {
+        // traverse node until get
+        node_ptr crr = parent;
+
+        while ((crr && crr->type != node_type::function) && (crr->type != node_type::block)) {
+            crr = crr->parent;
+        }
+
+        if (crr && crr->type == node_type::function) {
+            function_node_ptr func = std::dynamic_pointer_cast<function_node>(crr);
+
+            auto &res = std::find_if(func->func_scope_vars.begin(), func->func_scope_vars.end(),
+                [&](var_node_ptr var) { return var->var_name == ident_name; });
+
+            if (res == func->func_scope_vars.end()) {
+                return nullptr;
+            }
+
+            return *res;
+        } else if (crr && crr->type == node_type::block) {
+            std::shared_ptr<block_node> block = std::dynamic_pointer_cast<block_node>(crr);
+
+            auto &res = std::find_if(block->get_local_block_vars().begin(), block->get_local_block_vars().end(),
+                [&](var_node_ptr var) { return var->var_name == ident_name; });
+
+            if (res == block->get_local_block_vars().end()) {
+                return nullptr;
             }
 
             return *res;
@@ -611,12 +659,18 @@ namespace snack {
 
     std::shared_ptr<block_node> parser::parse_block(node_ptr parent) {
         std::shared_ptr<block_node> do_block = std::make_shared<block_node>(parent, *code_lexer.get_last_token());
+        parse_provide_block(parent, do_block);
+
+        return do_block;
+    }
+
+    void parser::parse_provide_block(node_ptr parent, std::shared_ptr<block_node> &do_block) {
         auto tok = code_lexer.peek();
 
         if (tok && tok->get_token_type() != token_type::indent) {
             // Get the do token, since the next token maybe in the line under
             do_report(error_panic_code::indentation_needed, error_level::error, *code_lexer.get_last_token());
-            return nullptr;
+            return;
         }
 
         code_lexer.next();
@@ -631,8 +685,6 @@ namespace snack {
 
             tok = code_lexer.peek();
         }
-
-        return do_block;
     }
 
     std::shared_ptr<node> parser::parse_do_chain(node_ptr parent) {
@@ -719,8 +771,10 @@ namespace snack {
             end_require_parentheses = true;
         }
 
+        cloop->do_block = std::make_shared<block_node>(cloop, *tok);
+
         while (tok && tok->get_token_type() != token_type::semicolon && tok->get_token_type() != token_type::eof) {
-            node_ptr decl = std::move(parse_stmt(cloop));
+            node_ptr decl = std::move(parse_stmt(cloop->do_block));
 
             if (decl)
                 cloop->init_jobs.push_back(decl);
@@ -737,7 +791,7 @@ namespace snack {
         tok = code_lexer.peek();
 
         while (tok && tok->get_token_type() != token_type::semicolon && tok->get_token_type() != token_type::eof) {
-            node_ptr n = std::move(parse_stmt(cloop));
+            node_ptr n = std::move(parse_stmt(cloop->do_block));
 
             if (!n) {
                 return cloop;
@@ -766,7 +820,7 @@ namespace snack {
 
         while (tok && tok->get_token_type() != token_type::parentheses && tok->get_token_type() != token_type::eof
             && tok->get_token_type() != token_type::colon) {
-            node_ptr n = std::move(parse_stmt(cloop));
+            node_ptr n = std::move(parse_stmt(cloop->do_block));
             node_type nt = n->get_node_type();
 
             cloop->end_jobs.push_back(n);
@@ -801,7 +855,14 @@ namespace snack {
             return cloop;
         }
 
-        cloop->do_block = std::move(parse_block(cloop));
+        std::vector<var_node_ptr> scope_init_loop_vars = std::move(cloop->do_block->local_block_vars);
+
+        cloop->do_block->column = code_lexer.get_current_token()->get_column();
+        cloop->do_block->line = code_lexer.get_current_token()->get_row();
+
+        cloop->do_block->local_block_vars.insert(cloop->do_block->local_block_vars.end(),
+            scope_init_loop_vars.begin(), scope_init_loop_vars.end());
+        parse_provide_block(parent, cloop->do_block);
 
         code_lexer.next();
 
@@ -883,7 +944,7 @@ namespace snack {
 
         var->var_name = name.get_raw_token_string();
 
-        if (get_var(parent, var->var_name)) {
+        if (get_var_nearest_scope(parent, var->var_name)) {
             // Give error: identifier already defined
             do_report(error_panic_code::var_declared, error_level::error, name,
                 name.get_raw_token_string());
@@ -892,16 +953,28 @@ namespace snack {
         }
 
         // traverse node until get
-        node_ptr crr = parent;
+        node_ptr func = parent;
 
-        while (crr && crr->type != node_type::function) {
-            crr = crr->parent;
+        while (func && func->type != node_type::function) {
+            func = func->parent;
+        }
+
+        function_node_ptr fn_ptr = std::dynamic_pointer_cast<function_node>(func);
+        fn_ptr->local_vars.push_back(var);
+
+        node_ptr scope = parent;
+        while ((scope && scope->type != node_type::function) && scope->type != node_type::block) {
+            scope = scope->parent;
         }
 
         var->var_type = make_undefined_type();
 
-        if (crr && crr->type == node_type::function) {
-            std::dynamic_pointer_cast<function_node>(crr)->local_vars.push_back(var);
+        if (scope && scope->type == node_type::function) {
+            function_node_ptr fn_scope = std::dynamic_pointer_cast<function_node>(scope);
+            fn_scope->func_scope_vars.push_back(var);
+        } else if (scope && scope->type == node_type::block) {
+            std::shared_ptr<block_node> block_scope = std::dynamic_pointer_cast<block_node>(scope);
+            block_scope->local_block_vars.push_back(var);
         } else {
             vars.push_back(var);
         }
@@ -1046,6 +1119,7 @@ namespace snack {
                     v->var_name = tok_str;
 
                     func->local_vars.push_back(std::move(v));
+                    func->func_scope_vars.push_back(func->local_vars.back());
                     func->args.push_back(func->local_vars.back());
 
                     code_lexer.next();

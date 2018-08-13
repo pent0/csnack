@@ -82,7 +82,7 @@ namespace snack::ir::backend {
         case opcode::strlc:
         case opcode::vri:
         case opcode::vrs: {
-            uint8_t idx = static_cast<uint8_t>(value);
+            uint16_t idx = static_cast<uint16_t>(value);
 
             ir_bin.write(reinterpret_cast<const char *>(&idx), 1);
             funcs.back().crr_pc += 1;

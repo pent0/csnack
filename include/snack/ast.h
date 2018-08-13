@@ -264,6 +264,7 @@ namespace snack {
 
         std::vector<var_node_ptr> args;
         std::vector<var_node_ptr> local_vars;
+        std::vector<var_node_ptr> func_scope_vars;
 
         std::string name;
 
@@ -284,6 +285,10 @@ namespace snack {
 
         std::vector<var_node_ptr> &get_local_vars() {
             return local_vars;
+        }
+
+        std::vector<var_node_ptr> &get_func_scope_vars() {
+            return func_scope_vars;
         }
     };
 
@@ -325,8 +330,16 @@ namespace snack {
     };
 
     class block_node : public stmt_node {
+        std::vector<std::shared_ptr<var_node>> local_block_vars;
+
+        friend class parser;
+
     public:
         block_node(node_ptr parent, token tok);
+        
+        std::vector<std::shared_ptr<var_node>> &get_local_block_vars() {
+            return local_block_vars;
+        }
     };
 
     class if_else_node : public stmt_node {

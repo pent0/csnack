@@ -84,7 +84,7 @@ namespace snack::ir::frontend {
         case opcode::strlc:
         case opcode::vri:
         case opcode::vrs: {
-            uint8_t idx = 0;
+            uint16_t idx = 0;
             ir_bin.read(reinterpret_cast<char *>(&idx), 1);
 
             std::cout << " 0x" << std::hex << (int)idx;
